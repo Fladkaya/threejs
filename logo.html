@@ -1,30 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
 
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0"
+    content="width=device-width, initial-scale=1"
   >
 
-  <title>Animated Digital Logo</title>
+  <title>Digital Logo</title>
 
   <style>
     html,
     body {
+      margin: 0;
       width: 100%;
       height: 100%;
-      margin: 0;
-      padding: 0;
       overflow: hidden;
       background: transparent;
     }
 
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .logo-wrap {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
     }
 
     #logoCanvas {
@@ -32,199 +32,212 @@
       width: 100%;
       height: 100%;
       background: transparent;
-
-      /*
-       * PNG используется как маска.
-       * Цифры будут видны только внутри логотипа.
-       */
-      -webkit-mask-image: url("https://static.tildacdn.com/tild3565-6238-4832-b335-646336323433/Group_143725952.png");
-      mask-image: url("https://static.tildacdn.com/tild3565-6238-4832-b335-646336323433/Group_143725952.png");
-
-      -webkit-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
-
-      -webkit-mask-position: center;
-      mask-position: center;
-
-      -webkit-mask-size: 90% 90%;
-      mask-size: 90% 90%;
-
-      -webkit-mask-mode: alpha;
-      mask-mode: alpha;
     }
   </style>
 </head>
 
 <body>
 
-<canvas id="logoCanvas"></canvas>
+<div class="logo-wrap">
+  <canvas id="logoCanvas"></canvas>
+</div>
 
 <script>
-  const canvas =
-    document.getElementById("logoCanvas");
-
-  const ctx =
-    canvas.getContext("2d");
-
+  const canvas = document.getElementById("logoCanvas");
+  const wrap = document.querySelector(".logo-wrap");
+  const ctx = canvas.getContext("2d");
 
   /*
-   * ========================================
-   * НАСТРОЙКИ
-   * ========================================
+   * Точное имя файла в GitHub.
+   * %20 означает пробел.
    */
+  const LOGO_URL = "./Group%20143725952.png";
 
   const SETTINGS = {
     /*
-     * Размер цифр.
-     * 5 px — примерно как на портрете.
+     * Размер сетки такой же,
+     * как в рабочем Digit 01.
+     */
+    cellSize: 7,
+
+    /*
+     * Размер самих цифр.
      */
     fontSize: 5,
 
-    /*
-     * Толщина цифр.
-     */
-    fontWeight: 400,
+    fontWeight: 600,
 
     /*
-     * Расстояние между цифрами.
+     * Размер логотипа внутри блока.
      */
-    horizontalGap: 6,
-    verticalGap: 6,
+    logoScale: 0.9,
 
     /*
-     * Цвет цифр.
+     * Скорость смены цифр.
      */
-    digitColor: "#111111",
+    scrambleSpeed: 7,
 
     /*
-     * Прозрачность цифр.
-     * Благодаря разной прозрачности
-     * логотип выглядит менее плоским.
+     * Примерно 6% цифр меняются.
      */
-    minOpacity: 0.28,
-    maxOpacity: 0.95,
+    animatedPercentage: 0.06,
 
     /*
-     * Скорость перебора.
-     *
-     * У каждой цифры будет
-     * собственный случайный интервал.
+     * Цвета для чёрного фона.
      */
-    minChangeDelay: 70,
-    maxChangeDelay: 550,
+    grayColor: "#b8b8b8",
+    whiteColor: "#ffffff",
 
-    /*
-     * Вероятность того, что цифра
-     * изменится при очередной проверке.
-     */
-    changeProbability: 0.78,
-
-    /*
-     * Сколько пространства занимает маска.
-     * Это значение также указано в CSS:
-     * mask-size: 90% 90%.
-     */
-    logoScale: 0.9
+    minOpacity: 0.7,
+    maxOpacity: 1
   };
 
+  let width = 1;
+  let height = 1;
+  let dpr = 1;
 
-  /*
-   * ========================================
-   * ПЕРЕМЕННЫЕ
-   * ========================================
-   */
+  let logoImage = null;
 
-  let canvasWidth = 0;
-  let canvasHeight = 0;
-
-  let pixelRatio = 1;
+  let logoX = 0;
+  let logoY = 0;
+  let logoWidth = 0;
+  let logoHeight = 0;
 
   let digits = [];
-
-  let animationFrame = null;
-
+  let lastStep = -1;
 
   /*
-   * ========================================
-   * СЛУЧАЙНЫЕ ЗНАЧЕНИЯ
-   * ========================================
+   * Вспомогательный canvas с цифрами.
    */
+  const digitsCanvas = document.createElement("canvas");
+  const digitsCtx = digitsCanvas.getContext("2d");
 
-  function randomNumber(min, max) {
+  /*
+   * Вспомогательный canvas с маской логотипа.
+   */
+  const maskCanvas = document.createElement("canvas");
+  const maskCtx = maskCanvas.getContext("2d");
+
+
+  function random(min, max) {
     return min + Math.random() * (max - min);
   }
 
 
   function randomDigit() {
-    return String(
-      Math.floor(Math.random() * 10)
+    return String(Math.floor(Math.random() * 10));
+  }
+
+
+  function loadLogo() {
+    return new Promise(function(resolve, reject) {
+      const image = new Image();
+
+      image.onload = function() {
+        logoImage = image;
+        resolve();
+      };
+
+      image.onerror = function() {
+        reject(
+          new Error(
+            "Не удалось загрузить файл Group 143725952.png"
+          )
+        );
+      };
+
+      /*
+       * Добавляем параметр,
+       * чтобы браузер не показывал старую версию.
+       */
+      image.src = LOGO_URL + "?v=15";
+    });
+  }
+
+
+  function calculateLogoSize() {
+    const imageAspect =
+      logoImage.naturalWidth /
+      logoImage.naturalHeight;
+
+    const availableWidth =
+      width * SETTINGS.logoScale;
+
+    const availableHeight =
+      height * SETTINGS.logoScale;
+
+    logoWidth = availableWidth;
+    logoHeight = logoWidth / imageAspect;
+
+    if (logoHeight > availableHeight) {
+      logoHeight = availableHeight;
+      logoWidth = logoHeight * imageAspect;
+    }
+
+    logoX = (width - logoWidth) / 2;
+    logoY = (height - logoHeight) / 2;
+  }
+
+
+  function createMask() {
+    maskCtx.clearRect(
+      0,
+      0,
+      width,
+      height
+    );
+
+    maskCtx.globalCompositeOperation =
+      "source-over";
+
+    maskCtx.globalAlpha = 1;
+
+    maskCtx.drawImage(
+      logoImage,
+      logoX,
+      logoY,
+      logoWidth,
+      logoHeight
     );
   }
 
 
-  /*
-   * ========================================
-   * СОЗДАНИЕ ЦИФРОВОЙ СЕТКИ
-   * ========================================
-   */
-
   function createDigits() {
     digits = [];
 
-    const now =
-      performance.now();
-
     let rowIndex = 0;
 
-    /*
-     * Цифры создаются по всей площади canvas.
-     * CSS-маска сама обрежет их по логотипу.
-     */
     for (
-      let y = 0;
-      y <= canvasHeight;
-      y += SETTINGS.verticalGap
+      let y = SETTINGS.cellSize / 2;
+      y <= height;
+      y += SETTINGS.cellSize
     ) {
-      /*
-       * Каждая вторая строка слегка смещена.
-       * Так цифровая текстура выглядит плотнее.
-       */
-      const rowOffset =
+      const offset =
         rowIndex % 2 === 0
-          ? 0
-          : SETTINGS.horizontalGap / 2;
+          ? SETTINGS.cellSize / 2
+          : SETTINGS.cellSize;
 
       for (
-        let x = rowOffset;
-        x <= canvasWidth;
-        x += SETTINGS.horizontalGap
+        let x = offset;
+        x <= width;
+        x += SETTINGS.cellSize
       ) {
         digits.push({
-          /*
-           * Эти координаты больше
-           * никогда не изменяются.
-           */
           x: x,
           y: y,
-
           value: randomDigit(),
 
-          opacity: randomNumber(
+          animated:
+            Math.random() <
+            SETTINGS.animatedPercentage,
+
+          opacity: random(
             SETTINGS.minOpacity,
             SETTINGS.maxOpacity
           ),
 
-          changeDelay: randomNumber(
-            SETTINGS.minChangeDelay,
-            SETTINGS.maxChangeDelay
-          ),
-
-          lastChange:
-            now -
-            randomNumber(
-              0,
-              SETTINGS.maxChangeDelay
-            )
+          white:
+            Math.random() > 0.48
         });
       }
 
@@ -233,188 +246,243 @@
   }
 
 
-  /*
-   * ========================================
-   * ИЗМЕНЕНИЕ ЗНАЧЕНИЙ
-   * ========================================
-   */
+  function resize() {
+    const rect = wrap.getBoundingClientRect();
+
+    width = Math.max(
+      1,
+      Math.round(rect.width)
+    );
+
+    height = Math.max(
+      1,
+      Math.round(rect.height)
+    );
+
+    dpr = Math.min(
+      window.devicePixelRatio || 1,
+      2
+    );
+
+    canvas.width =
+      Math.round(width * dpr);
+
+    canvas.height =
+      Math.round(height * dpr);
+
+    canvas.style.width =
+      width + "px";
+
+    canvas.style.height =
+      height + "px";
+
+    digitsCanvas.width =
+      Math.round(width * dpr);
+
+    digitsCanvas.height =
+      Math.round(height * dpr);
+
+    maskCanvas.width =
+      Math.round(width * dpr);
+
+    maskCanvas.height =
+      Math.round(height * dpr);
+
+    ctx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    digitsCtx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    maskCtx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    calculateLogoSize();
+    createMask();
+    createDigits();
+  }
+
 
   function updateDigits(time) {
-    for (const digit of digits) {
-      const elapsed =
-        time - digit.lastChange;
+    const step = Math.floor(
+      time /
+      (1000 / SETTINGS.scrambleSpeed)
+    );
 
-      if (elapsed < digit.changeDelay) {
+    if (step === lastStep) {
+      return;
+    }
+
+    lastStep = step;
+
+    for (const digit of digits) {
+      if (!digit.animated) {
         continue;
       }
 
-      /*
-       * Цифра остаётся на том же месте.
-       * Меняется только её значение.
-       */
-      if (
-        Math.random() <
-        SETTINGS.changeProbability
-      ) {
-        digit.value =
-          randomDigit();
+      digit.value = randomDigit();
 
-        digit.opacity =
-          randomNumber(
-            SETTINGS.minOpacity,
-            SETTINGS.maxOpacity
-          );
-      }
+      digit.opacity = random(
+        SETTINGS.minOpacity,
+        SETTINGS.maxOpacity
+      );
 
-      digit.lastChange = time;
-
-      digit.changeDelay =
-        randomNumber(
-          SETTINGS.minChangeDelay,
-          SETTINGS.maxChangeDelay
-        );
+      digit.white =
+        Math.random() > 0.45;
     }
   }
 
 
-  /*
-   * ========================================
-   * ОТРИСОВКА
-   * ========================================
-   */
-
   function drawDigits() {
-    ctx.clearRect(
+    digitsCtx.clearRect(
       0,
       0,
-      canvasWidth,
-      canvasHeight
+      width,
+      height
     );
 
-    ctx.font =
-      `${SETTINGS.fontWeight} ${SETTINGS.fontSize}px Arial, Helvetica, sans-serif`;
+    digitsCtx.globalCompositeOperation =
+      "source-over";
 
-    ctx.textAlign =
-      "center";
+    digitsCtx.textAlign = "center";
+    digitsCtx.textBaseline = "middle";
 
-    ctx.textBaseline =
-      "middle";
-
-    ctx.fillStyle =
-      SETTINGS.digitColor;
+    digitsCtx.font =
+      SETTINGS.fontWeight +
+      " " +
+      SETTINGS.fontSize +
+      "px Arial, Helvetica, monospace";
 
     for (const digit of digits) {
-      ctx.globalAlpha =
+      digitsCtx.globalAlpha =
         digit.opacity;
 
-      ctx.fillText(
+      digitsCtx.fillStyle =
+        digit.white
+          ? SETTINGS.whiteColor
+          : SETTINGS.grayColor;
+
+      digitsCtx.fillText(
         digit.value,
         digit.x,
         digit.y
       );
     }
 
-    ctx.globalAlpha = 1;
+    digitsCtx.globalAlpha = 1;
+
+    /*
+     * Обрезаем цифры по форме PNG.
+     */
+    digitsCtx.globalCompositeOperation =
+      "destination-in";
+
+    digitsCtx.drawImage(
+      maskCanvas,
+      0,
+      0,
+      width,
+      height
+    );
+
+    digitsCtx.globalCompositeOperation =
+      "source-over";
   }
 
 
-  /*
-   * ========================================
-   * АНИМАЦИЯ
-   * ========================================
-   */
-
-  function animate(time) {
+  function render(time) {
     updateDigits(time);
     drawDigits();
 
-    animationFrame =
-      requestAnimationFrame(animate);
+    ctx.clearRect(
+      0,
+      0,
+      width,
+      height
+    );
+
+    ctx.drawImage(
+      digitsCanvas,
+      0,
+      0,
+      width,
+      height
+    );
+
+    requestAnimationFrame(render);
   }
 
 
-  /*
-   * ========================================
-   * РАЗМЕР CANVAS
-   * ========================================
-   */
+  async function init() {
+    try {
+      await loadLogo();
 
-  function resizeCanvas() {
-    const rect =
-      canvas.getBoundingClientRect();
+      resize();
 
-    canvasWidth =
-      Math.max(1, rect.width);
-
-    canvasHeight =
-      Math.max(1, rect.height);
-
-    pixelRatio =
-      Math.min(
-        window.devicePixelRatio || 1,
-        2
+      window.addEventListener(
+        "resize",
+        resize
       );
 
-    canvas.width =
-      Math.round(
-        canvasWidth * pixelRatio
-      );
+      if (
+        typeof ResizeObserver !==
+        "undefined"
+      ) {
+        const observer =
+          new ResizeObserver(resize);
 
-    canvas.height =
-      Math.round(
-        canvasHeight * pixelRatio
-      );
+        observer.observe(wrap);
+      }
 
-    /*
-     * Все координаты продолжаем задавать
-     * в обычных CSS-пикселях.
-     */
-    ctx.setTransform(
-      pixelRatio,
-      0,
-      0,
-      pixelRatio,
-      0,
-      0
-    );
+      requestAnimationFrame(render);
 
-    createDigits();
-  }
+    } catch (error) {
+      console.error(error);
 
+      /*
+       * Сообщение об ошибке.
+       */
+      canvas.width =
+        Math.max(
+          300,
+          wrap.clientWidth
+        );
 
-  /*
-   * ========================================
-   * ЗАПУСК
-   * ========================================
-   */
+      canvas.height =
+        Math.max(
+          100,
+          wrap.clientHeight
+        );
 
-  function init() {
-    resizeCanvas();
+      ctx.fillStyle = "#ff3b30";
+      ctx.font = "14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
 
-    window.addEventListener(
-      "resize",
-      resizeCanvas
-    );
-
-    if (
-      typeof ResizeObserver !== "undefined"
-    ) {
-      const observer =
-        new ResizeObserver(function () {
-          resizeCanvas();
-        });
-
-      observer.observe(canvas);
-    }
-
-    if (animationFrame) {
-      cancelAnimationFrame(
-        animationFrame
+      ctx.fillText(
+        "Не найден файл Group 143725952.png",
+        canvas.width / 2,
+        canvas.height / 2
       );
     }
-
-    animationFrame =
-      requestAnimationFrame(animate);
   }
 
 
