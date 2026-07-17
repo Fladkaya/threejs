@@ -1,10 +1,13 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  <title>Animated Numbers Logo</title>
+  <title>Animated Digital Logo</title>
 
   <style>
     html,
@@ -16,10 +19,17 @@
       background: transparent;
     }
 
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     canvas {
       display: block;
       width: 100%;
       height: 100%;
+      background: transparent;
     }
   </style>
 </head>
@@ -32,72 +42,125 @@
 const canvas = document.getElementById("logoCanvas");
 const ctx = canvas.getContext("2d");
 
-/*
- * Вставь сюда прямую ссылку на PNG логотипа.
- */
-const LOGO_URL = "https://static.tildacdn.com/tild3565-6238-4832-b335-646336323433/Group_143725952.png";
+const LOGO_URL =
+  "https://static.tildacdn.com/tild3565-6238-4832-b335-646336323433/Group_143725952.png";
 
-/*
- * Основные настройки.
- */
+
+/* ========================================
+   НАСТРОЙКИ
+======================================== */
+
 const SETTINGS = {
-  background: "transparent",
 
-  digitColor: "#ffffff",
+  /*
+   * Размер всего логотипа внутри блока.
+   * 0.88 = 88% ширины или высоты.
+   */
+  logoScale: 0.88,
 
   /*
    * Размер цифр.
+   * Сделан маленьким и плотным.
    */
-  fontSize: 16,
+  fontSize: 8,
 
   /*
-   * Расстояние между колонками.
+   * Расстояние между цифрами по горизонтали.
    */
-  columnGap: 14,
+  columnGap: 9,
 
   /*
    * Расстояние между строками.
    */
-  rowGap: 18,
+  rowGap: 10,
 
   /*
-   * Чем больше значение, тем быстрее движение.
+   * Цвет цифр.
+   * Белый подходит для тёмного фона.
    */
-  minSpeed: 12,
-  maxSpeed: 38,
+  digitColor: "#ffffff",
 
   /*
-   * Прозрачность цифр.
+   * Минимальная и максимальная прозрачность.
    */
-  minOpacity: 0.28,
+  minOpacity: 0.25,
   maxOpacity: 1,
 
   /*
-   * Размер логотипа относительно canvas.
+   * Скорость самостоятельного движения цифр.
    */
-  logoScale: 0.82
+  minSpeed: 3,
+  maxSpeed: 13,
+
+  /*
+   * Как часто отдельные цифры меняются.
+   * Значения указаны в миллисекундах.
+   */
+  minChangeDelay: 100,
+  maxChangeDelay: 650,
+
+  /*
+   * Небольшое горизонтальное движение.
+   */
+  horizontalMovement: 1.5,
+
+  /*
+   * Небольшое вертикальное движение.
+   */
+  verticalMovement: 5,
+
+  /*
+   * Скорость лёгкого мерцания.
+   */
+  flickerSpeed: 0.002
 };
+
+
+/* ========================================
+   ПЕРЕМЕННЫЕ
+======================================== */
 
 let width = 0;
 let height = 0;
 let dpr = 1;
 
 let logoImage = null;
-let logoMaskCanvas = null;
-let logoMaskCtx = null;
 
 let logoX = 0;
 let logoY = 0;
 let logoWidth = 0;
 let logoHeight = 0;
 
-let streams = [];
+let particles = [];
+
+let maskCanvas;
+let maskCtx;
+
+let digitsCanvas;
+let digitsCtx;
+
 let lastTime = performance.now();
 
 
-/* =========================
+/* ========================================
+   ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+======================================== */
+
+function random(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+
+function randomDigit() {
+  return String(
+    Math.floor(Math.random() * 10)
+  );
+}
+
+
+/* ========================================
    ЗАГРУЗКА ЛОГОТИПА
-========================= */
+======================================== */
 
 function loadLogo() {
   return new Promise((resolve, reject) => {
@@ -112,9 +175,7 @@ function loadLogo() {
 
     image.onerror = () => {
       reject(
-        new Error(
-          "Не удалось загрузить изображение логотипа. Проверь прямую ссылку на PNG."
-        )
+        new Error("Не удалось загрузить логотип")
       );
     };
 
@@ -123,12 +184,15 @@ function loadLogo() {
 }
 
 
-/* =========================
-   РАЗМЕР CANVAS
-========================= */
+/* ========================================
+   ПОДГОТОВКА CANVAS
+======================================== */
 
 function resizeCanvas() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  dpr = Math.min(
+    window.devicePixelRatio || 1,
+    2
+  );
 
   width = window.innerWidth;
   height = window.innerHeight;
@@ -136,57 +200,10 @@ function resizeCanvas() {
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
 
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  if (logoImage) {
-    prepareLogoMask();
-    createStreams();
-  }
-}
-
-
-/* =========================
-   МАСКА ЛОГОТИПА
-========================= */
-
-function prepareLogoMask() {
-  const imageRatio =
-    logoImage.naturalWidth /
-    logoImage.naturalHeight;
-
-  const maxWidth =
-    width * SETTINGS.logoScale;
-
-  const maxHeight =
-    height * SETTINGS.logoScale;
-
-  logoWidth = maxWidth;
-  logoHeight = logoWidth / imageRatio;
-
-  if (logoHeight > maxHeight) {
-    logoHeight = maxHeight;
-    logoWidth = logoHeight * imageRatio;
-  }
-
-  logoX = (width - logoWidth) / 2;
-  logoY = (height - logoHeight) / 2;
-
-  logoMaskCanvas =
-    document.createElement("canvas");
-
-  logoMaskCanvas.width =
-    Math.max(1, Math.round(width * dpr));
-
-  logoMaskCanvas.height =
-    Math.max(1, Math.round(height * dpr));
-
-  logoMaskCtx =
-    logoMaskCanvas.getContext("2d");
-
-  logoMaskCtx.setTransform(
+  ctx.setTransform(
     dpr,
     0,
     0,
@@ -195,18 +212,104 @@ function prepareLogoMask() {
     0
   );
 
-  logoMaskCtx.clearRect(
+  prepareHiddenCanvases();
+  calculateLogoSize();
+  createLogoMask();
+  createParticles();
+}
+
+
+/* ========================================
+   СКРЫТЫЕ CANVAS
+======================================== */
+
+function prepareHiddenCanvases() {
+  maskCanvas =
+    document.createElement("canvas");
+
+  maskCanvas.width =
+    canvas.width;
+
+  maskCanvas.height =
+    canvas.height;
+
+  maskCtx =
+    maskCanvas.getContext("2d");
+
+  maskCtx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
+  );
+
+
+  digitsCanvas =
+    document.createElement("canvas");
+
+  digitsCanvas.width =
+    canvas.width;
+
+  digitsCanvas.height =
+    canvas.height;
+
+  digitsCtx =
+    digitsCanvas.getContext("2d");
+
+  digitsCtx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
+  );
+}
+
+
+/* ========================================
+   РАЗМЕР ЛОГОТИПА
+======================================== */
+
+function calculateLogoSize() {
+  const imageRatio =
+    logoImage.naturalWidth /
+    logoImage.naturalHeight;
+
+  const availableWidth =
+    width * SETTINGS.logoScale;
+
+  const availableHeight =
+    height * SETTINGS.logoScale;
+
+  logoWidth = availableWidth;
+  logoHeight = logoWidth / imageRatio;
+
+  if (logoHeight > availableHeight) {
+    logoHeight = availableHeight;
+    logoWidth = logoHeight * imageRatio;
+  }
+
+  logoX = (width - logoWidth) / 2;
+  logoY = (height - logoHeight) / 2;
+}
+
+
+/* ========================================
+   МАСКА ФОРМЫ ЛОГОТИПА
+======================================== */
+
+function createLogoMask() {
+  maskCtx.clearRect(
     0,
     0,
     width,
     height
   );
 
-  /*
-   * Рисуем PNG как маску.
-   * Используется прозрачность исходного изображения.
-   */
-  logoMaskCtx.drawImage(
+  maskCtx.drawImage(
     logoImage,
     logoX,
     logoY,
@@ -216,273 +319,230 @@ function prepareLogoMask() {
 }
 
 
-/* =========================
-   ПОТОКИ ЦИФР
-========================= */
+/* ========================================
+   СОЗДАНИЕ МЕЛКИХ ЦИФР
+======================================== */
 
-function randomDigit() {
-  return String(
-    Math.floor(Math.random() * 10)
-  );
-}
+function createParticles() {
+  particles = [];
 
-
-function randomBetween(min, max) {
-  return min + Math.random() * (max - min);
-}
-
-
-function createStreams() {
-  streams = [];
-
-  const startX =
-    logoX - SETTINGS.columnGap;
-
-  const endX =
-    logoX + logoWidth + SETTINGS.columnGap;
+  let rowIndex = 0;
 
   for (
-    let x = startX;
-    x <= endX;
-    x += SETTINGS.columnGap
+    let y = logoY;
+    y <= logoY + logoHeight;
+    y += SETTINGS.rowGap
   ) {
-    const direction =
-      Math.random() > 0.25 ? 1 : -1;
+    let columnIndex = 0;
 
-    const stream = {
-      x,
+    /*
+     * Каждую вторую строку немного сдвигаем.
+     * Получается более живая цифровая сетка.
+     */
+    const rowOffset =
+      rowIndex % 2 === 0
+        ? 0
+        : SETTINGS.columnGap / 2;
 
-      /*
-       * Каждая колонка начинает движение
-       * с собственной позиции.
-       */
-      offset:
-        Math.random() *
-        SETTINGS.rowGap,
+    for (
+      let x = logoX + rowOffset;
+      x <= logoX + logoWidth;
+      x += SETTINGS.columnGap
+    ) {
+      particles.push({
+        baseX: x,
+        baseY: y,
 
-      speed:
-        randomBetween(
-          SETTINGS.minSpeed,
-          SETTINGS.maxSpeed
-        ),
+        x,
+        y,
 
-      direction,
+        digit: randomDigit(),
 
-      opacity:
-        randomBetween(
+        opacity: random(
           SETTINGS.minOpacity,
           SETTINGS.maxOpacity
         ),
 
-      /*
-       * У каждой колонки свой ритм
-       * смены цифр.
-       */
-      changeInterval:
-        randomBetween(80, 260),
+        speed: random(
+          SETTINGS.minSpeed,
+          SETTINGS.maxSpeed
+        ),
 
-      lastChange: 0,
+        /*
+         * Каждая цифра получает
+         * собственное направление.
+         */
+        directionX:
+          Math.random() > 0.5 ? 1 : -1,
 
-      digits: []
-    };
+        directionY:
+          Math.random() > 0.5 ? 1 : -1,
 
-    const amount =
-      Math.ceil(
-        logoHeight /
-        SETTINGS.rowGap
-      ) + 5;
+        /*
+         * У каждой цифры своя фаза движения.
+         */
+        phaseX:
+          random(0, Math.PI * 2),
 
-    for (let i = 0; i < amount; i++) {
-      stream.digits.push(
-        randomDigit()
-      );
+        phaseY:
+          random(0, Math.PI * 2),
+
+        flickerPhase:
+          random(0, Math.PI * 2),
+
+        changeDelay:
+          random(
+            SETTINGS.minChangeDelay,
+            SETTINGS.maxChangeDelay
+          ),
+
+        lastChange:
+          performance.now() -
+          random(
+            0,
+            SETTINGS.maxChangeDelay
+          ),
+
+        columnIndex,
+        rowIndex
+      });
+
+      columnIndex++;
     }
 
-    streams.push(stream);
+    rowIndex++;
   }
 }
 
 
-/* =========================
-   ОБНОВЛЕНИЕ ДВИЖЕНИЯ
-========================= */
+/* ========================================
+   ОБНОВЛЕНИЕ ЦИФР
+======================================== */
 
-function updateStreams(delta, time) {
-  for (const stream of streams) {
-    stream.offset +=
-      stream.speed *
-      stream.direction *
-      delta;
+function updateParticles(time) {
+  for (const particle of particles) {
 
     /*
-     * Зацикливаем движение.
+     * Каждая цифра двигается независимо.
+     * Движение небольшое, чтобы форма
+     * логотипа визуально не разрушалась.
      */
-    if (
-      stream.offset >
-      SETTINGS.rowGap
-    ) {
-      stream.offset -=
-        SETTINGS.rowGap;
+    particle.x =
+      particle.baseX +
+      Math.sin(
+        time * 0.001 *
+        particle.speed +
+        particle.phaseX
+      ) *
+      SETTINGS.horizontalMovement *
+      particle.directionX;
 
-      stream.digits.unshift(
-        randomDigit()
-      );
+    particle.y =
+      particle.baseY +
+      Math.sin(
+        time * 0.001 *
+        particle.speed * 0.7 +
+        particle.phaseY
+      ) *
+      SETTINGS.verticalMovement *
+      particle.directionY;
 
-      stream.digits.pop();
-    }
-
-    if (
-      stream.offset <
-      -SETTINGS.rowGap
-    ) {
-      stream.offset +=
-        SETTINGS.rowGap;
-
-      stream.digits.push(
-        randomDigit()
-      );
-
-      stream.digits.shift();
-    }
 
     /*
-     * Цифры дополнительно меняются
-     * независимо от движения.
+     * Каждая цифра самостоятельно
+     * меняется через случайный интервал.
      */
     if (
-      time - stream.lastChange >
-      stream.changeInterval
+      time - particle.lastChange >
+      particle.changeDelay
     ) {
-      const index =
-        Math.floor(
-          Math.random() *
-          stream.digits.length
-        );
-
-      stream.digits[index] =
+      particle.digit =
         randomDigit();
 
-      stream.lastChange = time;
+      particle.lastChange =
+        time;
 
-      stream.changeInterval =
-        randomBetween(80, 260);
+      particle.changeDelay =
+        random(
+          SETTINGS.minChangeDelay,
+          SETTINGS.maxChangeDelay
+        );
+
+      particle.opacity =
+        random(
+          SETTINGS.minOpacity,
+          SETTINGS.maxOpacity
+        );
     }
   }
 }
 
 
-/* =========================
+/* ========================================
    ОТРИСОВКА ЦИФР
-========================= */
+======================================== */
 
-function drawDigits(targetCtx) {
-  targetCtx.clearRect(
+function drawDigits(time) {
+  digitsCtx.clearRect(
     0,
     0,
     width,
     height
   );
 
-  targetCtx.font =
-    `700 ${SETTINGS.fontSize}px monospace`;
+  digitsCtx.globalCompositeOperation =
+    "source-over";
 
-  targetCtx.textAlign =
+  digitsCtx.font =
+    `600 ${SETTINGS.fontSize}px Arial, sans-serif`;
+
+  digitsCtx.textAlign =
     "center";
 
-  targetCtx.textBaseline =
+  digitsCtx.textBaseline =
     "middle";
 
-  targetCtx.fillStyle =
+  digitsCtx.fillStyle =
     SETTINGS.digitColor;
 
-  for (const stream of streams) {
-    targetCtx.globalAlpha =
-      stream.opacity;
+  for (const particle of particles) {
 
-    const firstY =
-      logoY -
-      SETTINGS.rowGap * 2 +
-      stream.offset;
+    /*
+     * Лёгкое независимое мерцание.
+     */
+    const flicker =
+      0.72 +
+      Math.sin(
+        time *
+        SETTINGS.flickerSpeed +
+        particle.flickerPhase
+      ) * 0.28;
 
-    for (
-      let i = 0;
-      i < stream.digits.length;
-      i++
-    ) {
-      const y =
-        firstY +
-        i * SETTINGS.rowGap;
-
-      /*
-       * Небольшое индивидуальное
-       * колебание прозрачности.
-       */
-      const pulse =
-        0.72 +
-        Math.sin(
-          performance.now() * 0.002 +
-          i * 0.8 +
-          stream.x * 0.02
-        ) * 0.28;
-
-      targetCtx.globalAlpha =
-        stream.opacity * pulse;
-
-      targetCtx.fillText(
-        stream.digits[i],
-        stream.x,
-        y
+    digitsCtx.globalAlpha =
+      Math.max(
+        0.1,
+        particle.opacity * flicker
       );
-    }
-  }
 
-  targetCtx.globalAlpha = 1;
-}
-
-
-/* =========================
-   ФИНАЛЬНАЯ МАСКА
-========================= */
-
-const digitsCanvas =
-  document.createElement("canvas");
-
-const digitsCtx =
-  digitsCanvas.getContext("2d");
-
-
-function render() {
-  if (
-    digitsCanvas.width !==
-    canvas.width
-  ) {
-    digitsCanvas.width =
-      canvas.width;
-
-    digitsCanvas.height =
-      canvas.height;
-
-    digitsCtx.setTransform(
-      dpr,
-      0,
-      0,
-      dpr,
-      0,
-      0
+    digitsCtx.fillText(
+      particle.digit,
+      particle.x,
+      particle.y
     );
   }
 
-  drawDigits(digitsCtx);
+  digitsCtx.globalAlpha = 1;
+
 
   /*
-   * Оставляем цифры только внутри
-   * непрозрачной формы логотипа.
+   * Оставляем цифры только
+   * внутри формы логотипа.
    */
   digitsCtx.globalCompositeOperation =
     "destination-in";
 
   digitsCtx.drawImage(
-    logoMaskCanvas,
+    maskCanvas,
     0,
     0,
     canvas.width,
@@ -495,7 +555,14 @@ function render() {
 
   digitsCtx.globalCompositeOperation =
     "source-over";
+}
 
+
+/* ========================================
+   ФИНАЛЬНАЯ ОТРИСОВКА
+======================================== */
+
+function render(time) {
   ctx.clearRect(
     0,
     0,
@@ -503,10 +570,9 @@ function render() {
     height
   );
 
-  /*
-   * При прозрачном фоне логотип
-   * можно размещать поверх любого блока.
-   */
+  updateParticles(time);
+  drawDigits(time);
+
   ctx.drawImage(
     digitsCanvas,
     0,
@@ -521,36 +587,28 @@ function render() {
 }
 
 
-/* =========================
+/* ========================================
    АНИМАЦИЯ
-========================= */
+======================================== */
 
-function animate(currentTime) {
+function animate(time) {
   const delta =
     Math.min(
-      (currentTime - lastTime) /
-      1000,
+      (time - lastTime) / 1000,
       0.05
     );
 
-  lastTime = currentTime;
+  lastTime = time;
 
-  updateStreams(
-    delta,
-    currentTime
-  );
+  render(time, delta);
 
-  render();
-
-  requestAnimationFrame(
-    animate
-  );
+  requestAnimationFrame(animate);
 }
 
 
-/* =========================
+/* ========================================
    ЗАПУСК
-========================= */
+======================================== */
 
 async function init() {
   try {
@@ -563,21 +621,10 @@ async function init() {
       resizeCanvas
     );
 
-    requestAnimationFrame(
-      animate
-    );
+    requestAnimationFrame(animate);
+
   } catch (error) {
     console.error(error);
-
-    document.body.innerHTML =
-      `<div style="
-        padding:20px;
-        color:#ffffff;
-        font:16px Arial;
-      ">
-        Не удалось загрузить логотип.<br>
-        Проверь ссылку LOGO_URL.
-      </div>`;
   }
 }
 
