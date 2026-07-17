@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Animated Numbers Logo</title>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+
+<canvas id="logoCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById("logoCanvas");
+const ctx = canvas.getContext("2d");
+
+/*
+ * Вставь сюда прямую ссылку на PNG логотипа.
+ */
+const LOGO_URL = "https://static.tildacdn.com/tild3565-6238-4832-b335-646336323433/Group_143725952.png";
+
+/*
+ * Основные настройки.
+ */
+const SETTINGS = {
+  background: "transparent",
+
+  digitColor: "#ffffff",
+
+  /*
+   * Размер цифр.
+   */
+  fontSize: 16,
+
+  /*
+   * Расстояние между колонками.
+   */
+  columnGap: 14,
+
+  /*
+   * Расстояние между строками.
+   */
+  rowGap: 18,
+
+  /*
+   * Чем больше значение, тем быстрее движение.
+   */
+  minSpeed: 12,
+  maxSpeed: 38,
+
+  /*
+   * Прозрачность цифр.
+   */
+  minOpacity: 0.28,
+  maxOpacity: 1,
+
+  /*
+   * Размер логотипа относительно canvas.
+   */
+  logoScale: 0.82
+};
+
+let width = 0;
+let height = 0;
+let dpr = 1;
+
+let logoImage = null;
+let logoMaskCanvas = null;
+let logoMaskCtx = null;
+
+let logoX = 0;
+let logoY = 0;
+let logoWidth = 0;
+let logoHeight = 0;
+
+let streams = [];
+let lastTime = performance.now();
+
+
+/* =========================
+   ЗАГРУЗКА ЛОГОТИПА
+========================= */
+
+function loadLogo() {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.crossOrigin = "anonymous";
+
+    image.onload = () => {
+      logoImage = image;
+      resolve();
+    };
+
+    image.onerror = () => {
+      reject(
+        new Error(
+          "Не удалось загрузить изображение логотипа. Проверь прямую ссылку на PNG."
+        )
+      );
+    };
+
+    image.src = LOGO_URL;
+  });
+}
+
+
+/* =========================
+   РАЗМЕР CANVAS
+========================= */
+
+function resizeCanvas() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  width = window.innerWidth;
+  height = window.innerHeight;
+
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  if (logoImage) {
+    prepareLogoMask();
+    createStreams();
+  }
+}
+
+
+/* =========================
+   МАСКА ЛОГОТИПА
+========================= */
+
+function prepareLogoMask() {
+  const imageRatio =
+    logoImage.naturalWidth /
+    logoImage.naturalHeight;
+
+  const maxWidth =
+    width * SETTINGS.logoScale;
+
+  const maxHeight =
+    height * SETTINGS.logoScale;
+
+  logoWidth = maxWidth;
+  logoHeight = logoWidth / imageRatio;
+
+  if (logoHeight > maxHeight) {
+    logoHeight = maxHeight;
+    logoWidth = logoHeight * imageRatio;
+  }
+
+  logoX = (width - logoWidth) / 2;
+  logoY = (height - logoHeight) / 2;
+
+  logoMaskCanvas =
+    document.createElement("canvas");
+
+  logoMaskCanvas.width =
+    Math.max(1, Math.round(width * dpr));
+
+  logoMaskCanvas.height =
+    Math.max(1, Math.round(height * dpr));
+
+  logoMaskCtx =
+    logoMaskCanvas.getContext("2d");
+
+  logoMaskCtx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
+  );
+
+  logoMaskCtx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  /*
+   * Рисуем PNG как маску.
+   * Используется прозрачность исходного изображения.
+   */
+  logoMaskCtx.drawImage(
+    logoImage,
+    logoX,
+    logoY,
+    logoWidth,
+    logoHeight
+  );
+}
+
+
+/* =========================
+   ПОТОКИ ЦИФР
+========================= */
+
+function randomDigit() {
+  return String(
+    Math.floor(Math.random() * 10)
+  );
+}
+
+
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+
+function createStreams() {
+  streams = [];
+
+  const startX =
+    logoX - SETTINGS.columnGap;
+
+  const endX =
+    logoX + logoWidth + SETTINGS.columnGap;
+
+  for (
+    let x = startX;
+    x <= endX;
+    x += SETTINGS.columnGap
+  ) {
+    const direction =
+      Math.random() > 0.25 ? 1 : -1;
+
+    const stream = {
+      x,
+
+      /*
+       * Каждая колонка начинает движение
+       * с собственной позиции.
+       */
+      offset:
+        Math.random() *
+        SETTINGS.rowGap,
+
+      speed:
+        randomBetween(
+          SETTINGS.minSpeed,
+          SETTINGS.maxSpeed
+        ),
+
+      direction,
+
+      opacity:
+        randomBetween(
+          SETTINGS.minOpacity,
+          SETTINGS.maxOpacity
+        ),
+
+      /*
+       * У каждой колонки свой ритм
+       * смены цифр.
+       */
+      changeInterval:
+        randomBetween(80, 260),
+
+      lastChange: 0,
+
+      digits: []
+    };
+
+    const amount =
+      Math.ceil(
+        logoHeight /
+        SETTINGS.rowGap
+      ) + 5;
+
+    for (let i = 0; i < amount; i++) {
+      stream.digits.push(
+        randomDigit()
+      );
+    }
+
+    streams.push(stream);
+  }
+}
+
+
+/* =========================
+   ОБНОВЛЕНИЕ ДВИЖЕНИЯ
+========================= */
+
+function updateStreams(delta, time) {
+  for (const stream of streams) {
+    stream.offset +=
+      stream.speed *
+      stream.direction *
+      delta;
+
+    /*
+     * Зацикливаем движение.
+     */
+    if (
+      stream.offset >
+      SETTINGS.rowGap
+    ) {
+      stream.offset -=
+        SETTINGS.rowGap;
+
+      stream.digits.unshift(
+        randomDigit()
+      );
+
+      stream.digits.pop();
+    }
+
+    if (
+      stream.offset <
+      -SETTINGS.rowGap
+    ) {
+      stream.offset +=
+        SETTINGS.rowGap;
+
+      stream.digits.push(
+        randomDigit()
+      );
+
+      stream.digits.shift();
+    }
+
+    /*
+     * Цифры дополнительно меняются
+     * независимо от движения.
+     */
+    if (
+      time - stream.lastChange >
+      stream.changeInterval
+    ) {
+      const index =
+        Math.floor(
+          Math.random() *
+          stream.digits.length
+        );
+
+      stream.digits[index] =
+        randomDigit();
+
+      stream.lastChange = time;
+
+      stream.changeInterval =
+        randomBetween(80, 260);
+    }
+  }
+}
+
+
+/* =========================
+   ОТРИСОВКА ЦИФР
+========================= */
+
+function drawDigits(targetCtx) {
+  targetCtx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  targetCtx.font =
+    `700 ${SETTINGS.fontSize}px monospace`;
+
+  targetCtx.textAlign =
+    "center";
+
+  targetCtx.textBaseline =
+    "middle";
+
+  targetCtx.fillStyle =
+    SETTINGS.digitColor;
+
+  for (const stream of streams) {
+    targetCtx.globalAlpha =
+      stream.opacity;
+
+    const firstY =
+      logoY -
+      SETTINGS.rowGap * 2 +
+      stream.offset;
+
+    for (
+      let i = 0;
+      i < stream.digits.length;
+      i++
+    ) {
+      const y =
+        firstY +
+        i * SETTINGS.rowGap;
+
+      /*
+       * Небольшое индивидуальное
+       * колебание прозрачности.
+       */
+      const pulse =
+        0.72 +
+        Math.sin(
+          performance.now() * 0.002 +
+          i * 0.8 +
+          stream.x * 0.02
+        ) * 0.28;
+
+      targetCtx.globalAlpha =
+        stream.opacity * pulse;
+
+      targetCtx.fillText(
+        stream.digits[i],
+        stream.x,
+        y
+      );
+    }
+  }
+
+  targetCtx.globalAlpha = 1;
+}
+
+
+/* =========================
+   ФИНАЛЬНАЯ МАСКА
+========================= */
+
+const digitsCanvas =
+  document.createElement("canvas");
+
+const digitsCtx =
+  digitsCanvas.getContext("2d");
+
+
+function render() {
+  if (
+    digitsCanvas.width !==
+    canvas.width
+  ) {
+    digitsCanvas.width =
+      canvas.width;
+
+    digitsCanvas.height =
+      canvas.height;
+
+    digitsCtx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+  }
+
+  drawDigits(digitsCtx);
+
+  /*
+   * Оставляем цифры только внутри
+   * непрозрачной формы логотипа.
+   */
+  digitsCtx.globalCompositeOperation =
+    "destination-in";
+
+  digitsCtx.drawImage(
+    logoMaskCanvas,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+    0,
+    0,
+    width,
+    height
+  );
+
+  digitsCtx.globalCompositeOperation =
+    "source-over";
+
+  ctx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  /*
+   * При прозрачном фоне логотип
+   * можно размещать поверх любого блока.
+   */
+  ctx.drawImage(
+    digitsCanvas,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+    0,
+    0,
+    width,
+    height
+  );
+}
+
+
+/* =========================
+   АНИМАЦИЯ
+========================= */
+
+function animate(currentTime) {
+  const delta =
+    Math.min(
+      (currentTime - lastTime) /
+      1000,
+      0.05
+    );
+
+  lastTime = currentTime;
+
+  updateStreams(
+    delta,
+    currentTime
+  );
+
+  render();
+
+  requestAnimationFrame(
+    animate
+  );
+}
+
+
+/* =========================
+   ЗАПУСК
+========================= */
+
+async function init() {
+  try {
+    await loadLogo();
+
+    resizeCanvas();
+
+    window.addEventListener(
+      "resize",
+      resizeCanvas
+    );
+
+    requestAnimationFrame(
+      animate
+    );
+  } catch (error) {
+    console.error(error);
+
+    document.body.innerHTML =
+      `<div style="
+        padding:20px;
+        color:#ffffff;
+        font:16px Arial;
+      ">
+        Не удалось загрузить логотип.<br>
+        Проверь ссылку LOGO_URL.
+      </div>`;
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
