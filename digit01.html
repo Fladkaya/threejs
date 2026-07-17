@@ -1,266 +1,903 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Digit 01</title>
+  <meta charset="utf-8">
 
-<style>
-html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  background: #ffffff;
-  overflow: hidden;
-}
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
 
-.ds-digit-wrap {
-  width: 100vw;
-  height: 100vh;
-  background: #ffffff;
-  overflow: hidden;
-}
+  <title>Digital Logo</title>
 
-#dsDigitCanvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-</style>
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .ds-logo-wrap {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    #dsLogoCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="ds-digit-wrap">
-  <canvas id="dsDigitCanvas"></canvas>
+<div class="ds-logo-wrap">
+  <canvas id="dsLogoCanvas"></canvas>
 </div>
 
 <script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
+  import * as THREE from
+    "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
 
-const canvas = document.getElementById("dsDigitCanvas");
-const wrap = document.querySelector(".ds-digit-wrap");
 
-const renderer = new THREE.WebGLRenderer({
-  canvas,
-  antialias: true,
-  alpha: false
-});
+  const canvas =
+    document.getElementById("dsLogoCanvas");
 
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-renderer.setClearColor(0xffffff, 1);
+  const wrap =
+    document.querySelector(".ds-logo-wrap");
 
-const scene = new THREE.Scene();
-const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-function makeNumberMaskTexture(text = "01") {
-  const c = document.createElement("canvas");
-  c.width = 1400;
-  c.height = 700;
+  /*
+   * PNG-логотип.
+   */
+  const LOGO_URL =
+    "https://static.tildacdn.com/tild3565-6238-4832-b335-646336323433/Group_143725952.png";
 
-  const ctx = c.getContext("2d");
 
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, c.width, c.height);
+  /*
+   * =========================================
+   * RENDERER
+   * =========================================
+   */
 
-  ctx.fillStyle = "#000000";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "900 500px JetBrains Mono, Arial, sans-serif";
+  const renderer =
+    new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: true,
+      alpha: true,
+      premultipliedAlpha: false
+    });
 
-  ctx.fillText(text, c.width / 2, c.height / 2 + 20);
+  renderer.setPixelRatio(
+    Math.min(
+      2,
+      window.devicePixelRatio || 1
+    )
+  );
 
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
+  renderer.setClearColor(
+    0x000000,
+    0
+  );
 
-  return tex;
-}
 
-function makeDigitsAtlasTexture() {
-  const chars = "0123456789";
-  const grid = 4;
-  const cell = 96;
+  /*
+   * =========================================
+   * SCENE
+   * =========================================
+   */
 
-  const c = document.createElement("canvas");
-  c.width = grid * cell;
-  c.height = grid * cell;
+  const scene =
+    new THREE.Scene();
 
-  const ctx = c.getContext("2d");
+  const camera =
+    new THREE.OrthographicCamera(
+      -1,
+      1,
+      1,
+      -1,
+      0,
+      1
+    );
 
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, c.width, c.height);
 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `600 ${Math.floor(cell * 0.55)}px JetBrains Mono, monospace`;
-  ctx.fillStyle = "#000000";
+  /*
+   * =========================================
+   * АТЛАС ЦИФР
+   * =========================================
+   */
 
-  for (let i = 0; i < grid * grid; i++) {
-    const ch = chars[i % chars.length];
-    const x = (i % grid) * cell + cell / 2;
-    const y = Math.floor(i / grid) * cell + cell / 2;
-    ctx.fillText(ch, x, y);
-  }
+  function makeDigitsAtlasTexture() {
+    const characters =
+      "0123456789";
 
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
+    const grid = 4;
+    const cell = 96;
 
-  return { tex, grid };
-}
+    const atlasCanvas =
+      document.createElement("canvas");
 
-const { tex: digitsTex, grid: digitsGrid } = makeDigitsAtlasTexture();
+    atlasCanvas.width =
+      grid * cell;
 
-const mouse = new THREE.Vector2(0.5, 0.5);
-let active = 0;
+    atlasCanvas.height =
+      grid * cell;
 
-function setPointer(e) {
-  const r = canvas.getBoundingClientRect();
-  mouse.x = (e.clientX - r.left) / r.width;
-  mouse.y = 1.0 - (e.clientY - r.top) / r.height;
-}
+    const context =
+      atlasCanvas.getContext("2d");
 
-canvas.addEventListener("pointermove", setPointer);
-canvas.addEventListener("pointerenter", () => active = 1);
-canvas.addEventListener("pointerleave", () => active = 0);
 
-const uniforms = {
-  uTime: { value: 0 },
-  uRes: { value: new THREE.Vector2(1, 1) },
+    /*
+     * Белый фон атласа.
+     */
+    context.fillStyle =
+      "#ffffff";
 
-  uMask: { value: makeNumberMaskTexture("01") },
-  uDigits: { value: digitsTex },
-  uGrid: { value: digitsGrid },
+    context.fillRect(
+      0,
+      0,
+      atlasCanvas.width,
+      atlasCanvas.height
+    );
 
-  uCellPx: { value: 7.0 },
-  uContrast: { value: 2.2 },
-  uInk: { value: 0.12 },
 
-  uHoverInkMul: { value: 0.22 },
-  uBrushRadiusPx: { value: 110.0 },
-  uScrambleSpeed: { value: 7.0 },
+    /*
+     * Цифры.
+     */
+    context.textAlign =
+      "center";
 
-  uMouse: { value: mouse },
-  uActive: { value: 0.0 }
-};
+    context.textBaseline =
+      "middle";
 
-const material = new THREE.ShaderMaterial({
-  uniforms,
-  vertexShader: `
-    varying vec2 vUv;
+    context.font =
+      `600 ${Math.floor(cell * 0.55)}px Arial, monospace`;
 
-    void main() {
-      vUv = uv;
-      gl_Position = vec4(position.xy, 0.0, 1.0);
-    }
-  `,
-  fragmentShader: `
-    precision highp float;
+    context.fillStyle =
+      "#000000";
 
-    varying vec2 vUv;
 
-    uniform float uTime;
-    uniform vec2 uRes;
+    for (
+      let i = 0;
+      i < grid * grid;
+      i++
+    ) {
+      const character =
+        characters[i % characters.length];
 
-    uniform sampler2D uMask;
-    uniform sampler2D uDigits;
-    uniform float uGrid;
+      const x =
+        (i % grid) * cell +
+        cell / 2;
 
-    uniform float uCellPx;
-    uniform float uContrast;
-    uniform float uInk;
+      const y =
+        Math.floor(i / grid) * cell +
+        cell / 2;
 
-    uniform float uHoverInkMul;
-    uniform float uBrushRadiusPx;
-    uniform float uScrambleSpeed;
-
-    uniform vec2 uMouse;
-    uniform float uActive;
-
-    float hash12(vec2 p) {
-      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-      p3 += dot(p3, p3.yzx + 33.33);
-      return fract((p3.x + p3.y) * p3.z);
+      context.fillText(
+        character,
+        x,
+        y
+      );
     }
 
-    float luma(vec3 c) {
-      return dot(c, vec3(0.2126, 0.7152, 0.0722));
-    }
 
-    void main() {
-      vec3 bg = vec3(1.0);
-
-      vec2 frag = vUv * uRes;
-
-      float cell = max(5.0, uCellPx);
-      vec2 gid = floor(frag / cell);
-      vec2 fuv = fract(frag / cell);
-
-      float p = luma(texture2D(uMask, vUv).rgb);
-      float mask = pow(clamp(1.0 - p, 0.0, 1.0), uContrast);
-
-      vec2 mousePx = uMouse * uRes;
-      float distPx = distance(frag, mousePx);
-      float hover = uActive * smoothstep(uBrushRadiusPx, 0.0, distPx);
-
-      float speed = uScrambleSpeed + hover * 18.0;
-      float steps = floor(uTime * speed);
-
-      float baseDigit = floor(hash12(gid) * 10.0);
-      float liveDigit = floor(hash12(gid + vec2(steps, steps * 1.37)) * 10.0);
-
-      float animatedCells = step(0.94, hash12(gid * 0.37));
-
-      float digitVal = mix(baseDigit, liveDigit, animatedCells);
-
-      float gx = mod(digitVal, uGrid);
-      float gy = floor(digitVal / uGrid);
-
-      vec2 jitter = vec2(
-        hash12(gid) * 0.12,
-        hash12(gid + 13.7) * 0.12
+    const texture =
+      new THREE.CanvasTexture(
+        atlasCanvas
       );
 
-      vec2 atlasUv = (vec2(gx, gy) + fuv + jitter) / uGrid;
+    texture.colorSpace =
+      THREE.SRGBColorSpace;
 
-      float digit = 1.0 - texture2D(uDigits, atlasUv).r;
+    texture.minFilter =
+      THREE.LinearFilter;
 
-      float randomOpacity = mix(0.45, 1.0, hash12(gid * 2.0));
-      float inkAmount = digit * mask * randomOpacity;
+    texture.magFilter =
+      THREE.LinearFilter;
 
-      vec3 ink = vec3(uInk);
-      vec3 hoverInk = vec3(clamp(uInk * uHoverInkMul, 0.0, 1.0));
-      vec3 finalInk = mix(ink, hoverInk, hover);
+    texture.generateMipmaps =
+      false;
 
-      vec3 color = mix(bg, finalInk, inkAmount);
+    texture.needsUpdate =
+      true;
 
-      gl_FragColor = vec4(color, 1.0);
+
+    return {
+      texture: texture,
+      grid: grid
+    };
+  }
+
+
+  const {
+    texture: digitsTexture,
+    grid: digitsGrid
+  } = makeDigitsAtlasTexture();
+
+
+  /*
+   * =========================================
+   * ЗАГРУЗКА МАСКИ ЛОГОТИПА
+   * =========================================
+   */
+
+  const textureLoader =
+    new THREE.TextureLoader();
+
+  textureLoader.setCrossOrigin(
+    "anonymous"
+  );
+
+  const logoTexture =
+    textureLoader.load(
+      LOGO_URL,
+
+      function (texture) {
+        texture.colorSpace =
+          THREE.SRGBColorSpace;
+
+        texture.minFilter =
+          THREE.LinearFilter;
+
+        texture.magFilter =
+          THREE.LinearFilter;
+
+        texture.generateMipmaps =
+          false;
+
+        texture.needsUpdate =
+          true;
+      },
+
+      undefined,
+
+      function (error) {
+        console.error(
+          "Не удалось загрузить логотип:",
+          error
+        );
+      }
+    );
+
+
+  /*
+   * =========================================
+   * МЫШЬ
+   * =========================================
+   */
+
+  const mouse =
+    new THREE.Vector2(
+      0.5,
+      0.5
+    );
+
+  let active = 0;
+
+
+  function setPointer(event) {
+    const rect =
+      canvas.getBoundingClientRect();
+
+    mouse.x =
+      (event.clientX - rect.left) /
+      rect.width;
+
+    mouse.y =
+      1.0 -
+      (event.clientY - rect.top) /
+      rect.height;
+  }
+
+
+  canvas.addEventListener(
+    "pointermove",
+    setPointer
+  );
+
+  canvas.addEventListener(
+    "pointerenter",
+    function () {
+      active = 1;
     }
-  `
-});
+  );
 
-scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
+  canvas.addEventListener(
+    "pointerleave",
+    function () {
+      active = 0;
+    }
+  );
 
-function resize() {
-  const w = wrap.clientWidth;
-  const h = wrap.clientHeight;
 
-  renderer.setSize(w, h, false);
-  uniforms.uRes.value.set(w, h);
-}
+  /*
+   * =========================================
+   * UNIFORMS
+   * =========================================
+   */
 
-window.addEventListener("resize", resize);
-resize();
+  const uniforms = {
+    uTime: {
+      value: 0
+    },
 
-const clock = new THREE.Clock();
+    uRes: {
+      value:
+        new THREE.Vector2(1, 1)
+    },
 
-renderer.setAnimationLoop(() => {
-  uniforms.uTime.value += clock.getDelta();
-  uniforms.uActive.value = active ? 1.0 : 0.0;
+    /*
+     * Маска PNG-логотипа.
+     */
+    uMask: {
+      value: logoTexture
+    },
 
-  renderer.render(scene, camera);
-});
+    /*
+     * Пропорции PNG.
+     * Обновятся после загрузки.
+     */
+    uMaskAspect: {
+      value: 1
+    },
+
+    /*
+     * Размер логотипа в блоке.
+     */
+    uLogoScale: {
+      value: 0.88
+    },
+
+    uDigits: {
+      value: digitsTexture
+    },
+
+    uGrid: {
+      value: digitsGrid
+    },
+
+    /*
+     * Размер ячейки такой же,
+     * как в Digit 01.
+     */
+    uCellPx: {
+      value: 7.0
+    },
+
+    /*
+     * Базовая скорость перебора.
+     */
+    uScrambleSpeed: {
+      value: 7.0
+    },
+
+    /*
+     * Процент автоматически
+     * меняющихся ячеек.
+     *
+     * 0.94 означает около 6%.
+     */
+    uAnimatedThreshold: {
+      value: 0.94
+    },
+
+    /*
+     * Радиус реакции на курсор.
+     */
+    uBrushRadiusPx: {
+      value: 110.0
+    },
+
+    uMouse: {
+      value: mouse
+    },
+
+    uActive: {
+      value: 0
+    }
+  };
+
+
+  /*
+   * После загрузки изображения
+   * определяем его пропорции.
+   */
+  logoTexture.onUpdate =
+    function () {
+      if (
+        logoTexture.image &&
+        logoTexture.image.width &&
+        logoTexture.image.height
+      ) {
+        uniforms.uMaskAspect.value =
+          logoTexture.image.width /
+          logoTexture.image.height;
+      }
+    };
+
+
+  /*
+   * =========================================
+   * SHADER
+   * =========================================
+   */
+
+  const material =
+    new THREE.ShaderMaterial({
+      uniforms: uniforms,
+
+      transparent: true,
+
+      depthWrite: false,
+
+      vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+
+          gl_Position = vec4(
+            position.xy,
+            0.0,
+            1.0
+          );
+        }
+      `,
+
+      fragmentShader: `
+        precision highp float;
+
+        varying vec2 vUv;
+
+        uniform float uTime;
+        uniform vec2 uRes;
+
+        uniform sampler2D uMask;
+        uniform float uMaskAspect;
+        uniform float uLogoScale;
+
+        uniform sampler2D uDigits;
+        uniform float uGrid;
+
+        uniform float uCellPx;
+        uniform float uScrambleSpeed;
+        uniform float uAnimatedThreshold;
+
+        uniform float uBrushRadiusPx;
+
+        uniform vec2 uMouse;
+        uniform float uActive;
+
+
+        float hash12(vec2 p) {
+          vec3 p3 =
+            fract(
+              vec3(p.xyx) * 0.1031
+            );
+
+          p3 += dot(
+            p3,
+            p3.yzx + 33.33
+          );
+
+          return fract(
+            (p3.x + p3.y) *
+            p3.z
+          );
+        }
+
+
+        /*
+         * Масштабирование PNG
+         * с сохранением пропорций.
+         */
+        vec2 getMaskUv(
+          vec2 uv,
+          float screenAspect,
+          float imageAspect,
+          float scale
+        ) {
+          vec2 centered =
+            uv - 0.5;
+
+          if (
+            screenAspect >
+            imageAspect
+          ) {
+            centered.x *=
+              screenAspect /
+              imageAspect;
+          } else {
+            centered.y *=
+              imageAspect /
+              screenAspect;
+          }
+
+          centered /= scale;
+
+          return centered + 0.5;
+        }
+
+
+        void main() {
+          /*
+           * Координаты пикселя.
+           */
+          vec2 frag =
+            vUv * uRes;
+
+
+          /*
+           * Размер цифровой ячейки.
+           */
+          float cell =
+            max(
+              5.0,
+              uCellPx
+            );
+
+          vec2 gid =
+            floor(
+              frag / cell
+            );
+
+          vec2 fuv =
+            fract(
+              frag / cell
+            );
+
+
+          /*
+           * Маска логотипа.
+           */
+          float screenAspect =
+            uRes.x /
+            max(uRes.y, 1.0);
+
+          vec2 maskUv =
+            getMaskUv(
+              vUv,
+              screenAspect,
+              uMaskAspect,
+              uLogoScale
+            );
+
+
+          /*
+           * За пределами изображения
+           * ничего не показываем.
+           */
+          float inside =
+            step(0.0, maskUv.x) *
+            step(maskUv.x, 1.0) *
+            step(0.0, maskUv.y) *
+            step(maskUv.y, 1.0);
+
+
+          vec4 maskSample =
+            texture2D(
+              uMask,
+              clamp(
+                maskUv,
+                0.0,
+                1.0
+              )
+            );
+
+
+          /*
+           * Используем прозрачность PNG.
+           */
+          float mask =
+            maskSample.a *
+            inside;
+
+
+          /*
+           * Курсор.
+           */
+          vec2 mousePx =
+            uMouse * uRes;
+
+          float distPx =
+            distance(
+              frag,
+              mousePx
+            );
+
+          float hover =
+            uActive *
+            smoothstep(
+              uBrushRadiusPx,
+              0.0,
+              distPx
+            );
+
+
+          /*
+           * Скорость такая же,
+           * как в Digit 01.
+           */
+          float speed =
+            uScrambleSpeed +
+            hover * 18.0;
+
+          float steps =
+            floor(
+              uTime * speed
+            );
+
+
+          /*
+           * Начальная цифра,
+           * которая закреплена за ячейкой.
+           */
+          float baseDigit =
+            floor(
+              hash12(gid) *
+              10.0
+            );
+
+
+          /*
+           * Новое случайное значение.
+           */
+          float liveDigit =
+            floor(
+              hash12(
+                gid +
+                vec2(
+                  steps,
+                  steps * 1.37
+                )
+              ) *
+              10.0
+            );
+
+
+          /*
+           * Только небольшая часть
+           * ячеек перебирается постоянно.
+           */
+          float animatedCells =
+            step(
+              uAnimatedThreshold,
+              hash12(
+                gid * 0.37
+              )
+            );
+
+
+          /*
+           * В зоне курсора меняется
+           * больше цифр.
+           */
+          float hoverCells =
+            step(
+              0.62,
+              hash12(
+                gid +
+                vec2(
+                  steps * 0.23,
+                  steps * 0.41
+                )
+              )
+            ) * hover;
+
+
+          float animationAmount =
+            max(
+              animatedCells,
+              hoverCells
+            );
+
+
+          float digitValue =
+            mix(
+              baseDigit,
+              liveDigit,
+              animationAmount
+            );
+
+
+          /*
+           * Выбираем цифру
+           * из атласа.
+           */
+          float gx =
+            mod(
+              digitValue,
+              uGrid
+            );
+
+          float gy =
+            floor(
+              digitValue /
+              uGrid
+            );
+
+
+          vec2 jitter =
+            vec2(
+              hash12(gid) * 0.12,
+              hash12(
+                gid + 13.7
+              ) * 0.12
+            );
+
+
+          vec2 atlasUv =
+            (
+              vec2(gx, gy) +
+              fuv +
+              jitter
+            ) /
+            uGrid;
+
+
+          float digitShape =
+            1.0 -
+            texture2D(
+              uDigits,
+              atlasUv
+            ).r;
+
+
+          /*
+           * Разная прозрачность
+           * отдельных цифр.
+           */
+          float randomOpacity =
+            mix(
+              0.42,
+              1.0,
+              hash12(
+                gid * 2.0
+              )
+            );
+
+
+          /*
+           * Белые и серые цифры.
+           */
+          float grayMix =
+            hash12(
+              gid * 4.73
+            );
+
+          vec3 grayColor =
+            vec3(0.58);
+
+          vec3 whiteColor =
+            vec3(1.0);
+
+          vec3 digitColor =
+            mix(
+              grayColor,
+              whiteColor,
+              grayMix
+            );
+
+
+          /*
+           * При наведении цифры
+           * становятся немного светлее.
+           */
+          digitColor =
+            mix(
+              digitColor,
+              vec3(1.0),
+              hover * 0.45
+            );
+
+
+          float alpha =
+            digitShape *
+            mask *
+            randomOpacity;
+
+
+          gl_FragColor =
+            vec4(
+              digitColor,
+              alpha
+            );
+        }
+      `
+    });
+
+
+  /*
+   * =========================================
+   * PLANE
+   * =========================================
+   */
+
+  const geometry =
+    new THREE.PlaneGeometry(
+      2,
+      2
+    );
+
+  const mesh =
+    new THREE.Mesh(
+      geometry,
+      material
+    );
+
+  scene.add(mesh);
+
+
+  /*
+   * =========================================
+   * RESIZE
+   * =========================================
+   */
+
+  function resize() {
+    const width =
+      Math.max(
+        1,
+        wrap.clientWidth
+      );
+
+    const height =
+      Math.max(
+        1,
+        wrap.clientHeight
+      );
+
+    renderer.setSize(
+      width,
+      height,
+      false
+    );
+
+    uniforms.uRes.value.set(
+      width,
+      height
+    );
+  }
+
+
+  window.addEventListener(
+    "resize",
+    resize
+  );
+
+  resize();
+
+
+  /*
+   * =========================================
+   * ANIMATION
+   * =========================================
+   */
+
+  const clock =
+    new THREE.Clock();
+
+
+  renderer.setAnimationLoop(
+    function () {
+      uniforms.uTime.value +=
+        clock.getDelta();
+
+      uniforms.uActive.value =
+        active ? 1.0 : 0.0;
+
+      renderer.render(
+        scene,
+        camera
+      );
+    }
+  );
 </script>
 
 </body>
