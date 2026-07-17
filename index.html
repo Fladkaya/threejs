@@ -39,40 +39,60 @@ const renderer = new THREE.WebGLRenderer({
   alpha: false
 });
 
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0xffffff, 1);
+renderer.setPixelRatio(
+  Math.min(2, window.devicePixelRatio)
+);
 
-document.body.appendChild(renderer.domElement);
+renderer.setSize(
+  window.innerWidth,
+  window.innerHeight
+);
+
+renderer.setClearColor(
+  0xffffff,
+  1
+);
+
+document.body.appendChild(
+  renderer.domElement
+);
 
 
 /* =========================
    SCENE / CAMERA
 ========================= */
 
-const scene = new THREE.Scene();
+const scene =
+  new THREE.Scene();
 
-const camera = new THREE.OrthographicCamera(
-  -1,
-  1,
-  1,
-  -1,
-  0,
-  1
-);
+const camera =
+  new THREE.OrthographicCamera(
+    -1,
+    1,
+    1,
+    -1,
+    0,
+    1
+  );
 
 
 /* =========================
    PHOTO
 ========================= */
 
-const photoTex = await new THREE.TextureLoader().loadAsync(
-  "https://static.tildacdn.com/tild3630-6130-4336-b734-396338333766/pexels-lepta-studio-.webp"
-);
+const photoTex =
+  await new THREE.TextureLoader().loadAsync(
+    "https://static.tildacdn.com/tild3630-6130-4336-b734-396338333766/pexels-lepta-studio-.webp"
+  );
 
-photoTex.colorSpace = THREE.SRGBColorSpace;
-photoTex.minFilter = THREE.LinearFilter;
-photoTex.magFilter = THREE.LinearFilter;
+photoTex.colorSpace =
+  THREE.SRGBColorSpace;
+
+photoTex.minFilter =
+  THREE.LinearFilter;
+
+photoTex.magFilter =
+  THREE.LinearFilter;
 
 
 /* =========================
@@ -84,14 +104,21 @@ function makeDigitsAtlasTexture() {
   const grid = 4;
   const cell = 96;
 
-  const canvas = document.createElement("canvas");
+  const canvas =
+    document.createElement("canvas");
 
-  canvas.width = grid * cell;
-  canvas.height = grid * cell;
+  canvas.width =
+    grid * cell;
 
-  const ctx = canvas.getContext("2d");
+  canvas.height =
+    grid * cell;
 
-  ctx.fillStyle = "#ffffff";
+  const ctx =
+    canvas.getContext("2d");
+
+  ctx.fillStyle =
+    "#ffffff";
+
   ctx.fillRect(
     0,
     0,
@@ -99,15 +126,23 @@ function makeDigitsAtlasTexture() {
     canvas.height
   );
 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  ctx.textAlign =
+    "center";
+
+  ctx.textBaseline =
+    "middle";
 
   ctx.font =
     `800 ${Math.floor(cell * 0.82)}px monospace`;
 
-  ctx.fillStyle = "#000000";
+  ctx.fillStyle =
+    "#000000";
 
-  for (let i = 0; i < grid * grid; i++) {
+  for (
+    let i = 0;
+    i < grid * grid;
+    i++
+  ) {
     const character =
       chars[i % chars.length];
 
@@ -127,7 +162,9 @@ function makeDigitsAtlasTexture() {
   }
 
   const texture =
-    new THREE.CanvasTexture(canvas);
+    new THREE.CanvasTexture(
+      canvas
+    );
 
   texture.colorSpace =
     THREE.SRGBColorSpace;
@@ -159,13 +196,17 @@ const digitsGrid =
 ========================= */
 
 const mouse =
-  new THREE.Vector2(0.5, 0.5);
+  new THREE.Vector2(
+    0.5,
+    0.5
+  );
 
 let active = 0;
 
 function setPointer(event) {
   const rect =
-    renderer.domElement.getBoundingClientRect();
+    renderer.domElement
+      .getBoundingClientRect();
 
   mouse.x =
     (event.clientX - rect.left) /
@@ -177,50 +218,60 @@ function setPointer(event) {
     rect.height;
 }
 
-renderer.domElement.addEventListener(
-  "pointermove",
-  setPointer
-);
+renderer.domElement
+  .addEventListener(
+    "pointermove",
+    setPointer
+  );
 
-renderer.domElement.addEventListener(
-  "pointerenter",
-  event => {
-    if (event.pointerType === "mouse") {
+renderer.domElement
+  .addEventListener(
+    "pointerenter",
+    event => {
+      if (
+        event.pointerType === "mouse"
+      ) {
+        active = 1;
+      }
+    }
+  );
+
+renderer.domElement
+  .addEventListener(
+    "pointerleave",
+    event => {
+      if (
+        event.pointerType === "mouse"
+      ) {
+        active = 0;
+      }
+    }
+  );
+
+renderer.domElement
+  .addEventListener(
+    "pointerdown",
+    event => {
+      setPointer(event);
       active = 1;
     }
-  }
-);
+  );
 
-renderer.domElement.addEventListener(
-  "pointerleave",
-  event => {
-    if (event.pointerType === "mouse") {
+renderer.domElement
+  .addEventListener(
+    "pointerup",
+    () => {
       active = 0;
     }
-  }
-);
+  );
 
-renderer.domElement.addEventListener(
-  "pointerdown",
-  event => {
-    setPointer(event);
-    active = 1;
-  }
-);
-
-renderer.domElement.addEventListener(
-  "pointerup",
-  () => {
-    active = 0;
-  }
-);
-
-renderer.domElement.addEventListener(
-  "pointercancel",
-  () => {
-    active = 0;
-  }
-);
+renderer.domElement
+  .addEventListener(
+    "pointercancel",
+    () => {
+      active = 0;
+    }
+  );
 
 
 /* =========================
@@ -252,8 +303,8 @@ const uniforms = {
   },
 
   /*
-   * Размер клетки с цифрой.
-   * Меньше — цифр больше.
+   * Размер цифр.
+   * Меньше значение — больше цифр.
    */
   uCellPx: {
     value: 9.0
@@ -268,18 +319,37 @@ const uniforms = {
   },
 
   /*
-   * Плотность цифр.
+   * Общая насыщенность портрета.
    */
   uDensity: {
     value: 2.4
   },
 
   /*
-   * Начало нижнего растворения.
-   * 0.30 означает примерно 30% высоты снизу.
+   * Нижняя точка, где портрет
+   * почти полностью исчезает.
    */
-  uBottomFadeHeight: {
-    value: 0.40
+  uFadeBottom: {
+    value: 0.02
+  },
+
+  /*
+   * Высота, на которой портрет
+   * становится полностью видимым.
+   *
+   * 0.42 означает, что переход
+   * занимает нижние 42% экрана.
+   */
+  uFadeTop: {
+    value: 0.42
+  },
+
+  /*
+   * Сила плавности перехода.
+   * Больше — сильнее исчезновение снизу.
+   */
+  uFadePower: {
+    value: 1.7
   },
 
   uHoverInkMul: {
@@ -310,311 +380,315 @@ const uniforms = {
 
 const material =
   new THREE.ShaderMaterial({
+    uniforms,
 
-  uniforms,
+    vertexShader: `
+      varying vec2 vUv;
 
-  vertexShader: `
-    varying vec2 vUv;
+      void main() {
+        vUv = uv;
 
-    void main() {
-      vUv = uv;
-
-      gl_Position = vec4(
-        position.xy,
-        0.0,
-        1.0
-      );
-    }
-  `,
-
-  fragmentShader: `
-    precision highp float;
-
-    varying vec2 vUv;
-
-    uniform float uTime;
-    uniform vec2 uRes;
-
-    uniform sampler2D uPhoto;
-    uniform sampler2D uDigits;
-
-    uniform float uGrid;
-    uniform float uCellPx;
-    uniform float uInk;
-    uniform float uDensity;
-    uniform float uBottomFadeHeight;
-
-    uniform float uHoverInkMul;
-    uniform float uBrushRadiusPx;
-    uniform float uScrambleSpeed;
-
-    uniform vec2 uMouse;
-    uniform float uActive;
-
-
-    float hash12(vec2 p) {
-      vec3 p3 =
-        fract(
-          vec3(p.xyx) *
-          0.1031
-        );
-
-      p3 +=
-        dot(
-          p3,
-          p3.yzx + 33.33
-        );
-
-      return fract(
-        (p3.x + p3.y) *
-        p3.z
-      );
-    }
-
-
-    float luma(vec3 color) {
-      return dot(
-        color,
-        vec3(
-          0.2126,
-          0.7152,
-          0.0722
-        )
-      );
-    }
-
-
-    void main() {
-      vec3 background =
-        vec3(1.0);
-
-      vec2 fragmentPosition =
-        vUv * uRes;
-
-      float cell =
-        max(
-          6.0,
-          uCellPx
-        );
-
-      vec2 gridId =
-        floor(
-          fragmentPosition /
-          cell
-        );
-
-      vec2 cellUv =
-        fract(
-          fragmentPosition /
-          cell
-        );
-
-
-      /*
-       * Яркость фотографии.
-       */
-      vec3 photo =
-        texture2D(
-          uPhoto,
-          vUv
-        ).rgb;
-
-      float photoLuma =
-        luma(photo);
-
-
-      /*
-       * Основная маска портрета.
-       */
-      float portraitMask =
-        smoothstep(
-          0.02,
-          0.78,
-          1.0 - photoLuma
-        );
-
-      portraitMask =
-        pow(
-          portraitMask,
-          0.55
-        );
-
-
-      /*
-       * Плавное растворение нижней части.
-       *
-       * В самом низу значение равно 0.
-       * Выше uBottomFadeHeight — значение равно 1.
-       */
-      float bottomFade =
-        smoothstep(
-          0.0,
-          uBottomFadeHeight,
-          vUv.y
-        );
-
-      /*
-       * Делаем переход ещё мягче.
-       */
-      bottomFade =
-        bottomFade *
-        bottomFade *
-        (
-          3.0 -
-          2.0 * bottomFade
-        );
-
-      portraitMask *=
-        bottomFade;
-
-
-      /*
-       * Область курсора.
-       */
-      vec2 mousePx =
-        uMouse * uRes;
-
-      float distanceToMouse =
-        distance(
-          fragmentPosition,
-          mousePx
-        );
-
-      float hover =
-        uActive *
-        step(
-          distanceToMouse,
-          uBrushRadiusPx
-        );
-
-
-      /*
-       * Выбираем цифру.
-       */
-      float baseDigit =
-        floor(
-          hash12(gridId) *
-          10.0
-        );
-
-      float animationStep =
-        floor(
-          uTime *
-          uScrambleSpeed
-        );
-
-      float animatedDigit =
-        floor(
-          hash12(
-            gridId +
-            vec2(
-              animationStep,
-              animationStep * 1.37
-            )
-          ) *
-          10.0
-        );
-
-      float digitValue =
-        mix(
-          baseDigit,
-          animatedDigit,
-          hover
-        );
-
-
-      /*
-       * Координаты цифры в атласе.
-       */
-      float gridX =
-        mod(
-          digitValue,
-          uGrid
-        );
-
-      float gridY =
-        floor(
-          digitValue /
-          uGrid
-        );
-
-      vec2 atlasUv =
-        (
-          vec2(
-            gridX,
-            gridY
-          ) +
-          cellUv
-        ) /
-        uGrid;
-
-
-      /*
-       * Форма цифры.
-       */
-      float digit =
-        1.0 -
-        texture2D(
-          uDigits,
-          atlasUv
-        ).r;
-
-
-      /*
-       * Насыщенность цифр.
-       */
-      float inkAmount =
-        clamp(
-          digit *
-          portraitMask *
-          uDensity,
+        gl_Position = vec4(
+          position.xy,
           0.0,
           1.0
         );
+      }
+    `,
+
+    fragmentShader: `
+      precision highp float;
+
+      varying vec2 vUv;
+
+      uniform float uTime;
+      uniform vec2 uRes;
+
+      uniform sampler2D uPhoto;
+      uniform sampler2D uDigits;
+
+      uniform float uGrid;
+      uniform float uCellPx;
+      uniform float uInk;
+      uniform float uDensity;
+
+      uniform float uFadeBottom;
+      uniform float uFadeTop;
+      uniform float uFadePower;
+
+      uniform float uHoverInkMul;
+      uniform float uBrushRadiusPx;
+      uniform float uScrambleSpeed;
+
+      uniform vec2 uMouse;
+      uniform float uActive;
 
 
-      /*
-       * Цвет цифр.
-       */
-      vec3 normalInk =
-        vec3(uInk);
+      float hash12(vec2 p) {
+        vec3 p3 =
+          fract(
+            vec3(p.xyx) *
+            0.1031
+          );
 
-      vec3 hoverInk =
-        vec3(
-          clamp(
-            uInk *
-            uHoverInkMul,
-            0.0,
-            1.0
+        p3 +=
+          dot(
+            p3,
+            p3.yzx + 33.33
+          );
+
+        return fract(
+          (p3.x + p3.y) *
+          p3.z
+        );
+      }
+
+
+      float luma(vec3 color) {
+        return dot(
+          color,
+          vec3(
+            0.2126,
+            0.7152,
+            0.0722
           )
         );
-
-      vec3 finalInk =
-        mix(
-          normalInk,
-          hoverInk,
-          hover
-        );
+      }
 
 
-      /*
-       * Финальный цвет.
-       */
-      vec3 finalColor =
-        mix(
-          background,
-          finalInk,
-          inkAmount
-        );
+      void main() {
+        vec3 background =
+          vec3(1.0);
 
-      gl_FragColor =
-        vec4(
-          finalColor,
-          1.0
-        );
-    }
-  `
-});
+        vec2 fragmentPosition =
+          vUv * uRes;
+
+        float cell =
+          max(
+            6.0,
+            uCellPx
+          );
+
+        vec2 gridId =
+          floor(
+            fragmentPosition /
+            cell
+          );
+
+        vec2 cellUv =
+          fract(
+            fragmentPosition /
+            cell
+          );
+
+
+        /*
+         * Получаем яркость фотографии.
+         */
+        vec3 photo =
+          texture2D(
+            uPhoto,
+            vUv
+          ).rgb;
+
+        float photoLuma =
+          luma(photo);
+
+
+        /*
+         * Создаём основную маску портрета.
+         */
+        float portraitMask =
+          smoothstep(
+            0.02,
+            0.78,
+            1.0 - photoLuma
+          );
+
+        portraitMask =
+          pow(
+            portraitMask,
+            0.55
+          );
+
+
+        /*
+         * Область курсора.
+         */
+        vec2 mousePx =
+          uMouse * uRes;
+
+        float distanceToMouse =
+          distance(
+            fragmentPosition,
+            mousePx
+          );
+
+        float hover =
+          uActive *
+          step(
+            distanceToMouse,
+            uBrushRadiusPx
+          );
+
+
+        /*
+         * Выбираем цифру для клетки.
+         */
+        float baseDigit =
+          floor(
+            hash12(gridId) *
+            10.0
+          );
+
+        float animationStep =
+          floor(
+            uTime *
+            uScrambleSpeed
+          );
+
+        float animatedDigit =
+          floor(
+            hash12(
+              gridId +
+              vec2(
+                animationStep,
+                animationStep * 1.37
+              )
+            ) *
+            10.0
+          );
+
+        float digitValue =
+          mix(
+            baseDigit,
+            animatedDigit,
+            hover
+          );
+
+
+        /*
+         * Позиция выбранной цифры
+         * в атласе.
+         */
+        float gridX =
+          mod(
+            digitValue,
+            uGrid
+          );
+
+        float gridY =
+          floor(
+            digitValue /
+            uGrid
+          );
+
+        vec2 atlasUv =
+          (
+            vec2(
+              gridX,
+              gridY
+            ) +
+            cellUv
+          ) /
+          uGrid;
+
+
+        /*
+         * Получаем форму цифры.
+         */
+        float digit =
+          1.0 -
+          texture2D(
+            uDigits,
+            atlasUv
+          ).r;
+
+
+        /*
+         * Сначала усиливаем цифры.
+         */
+        float inkAmount =
+          clamp(
+            digit *
+            portraitMask *
+            uDensity,
+            0.0,
+            1.0
+          );
+
+
+        /*
+         * Затем отдельно создаём
+         * нижнее растворение.
+         *
+         * Внизу fade = 0.
+         * Выше uFadeTop fade = 1.
+         */
+        float bottomFade =
+          smoothstep(
+            uFadeBottom,
+            uFadeTop,
+            vUv.y
+          );
+
+        bottomFade =
+          pow(
+            bottomFade,
+            uFadePower
+          );
+
+
+        /*
+         * Важно: затухание применяется
+         * после усиления плотности.
+         */
+        inkAmount *=
+          bottomFade;
+
+
+        /*
+         * Цвет цифр.
+         */
+        vec3 normalInk =
+          vec3(uInk);
+
+        vec3 hoverInk =
+          vec3(
+            clamp(
+              uInk *
+              uHoverInkMul,
+              0.0,
+              1.0
+            )
+          );
+
+        vec3 finalInk =
+          mix(
+            normalInk,
+            hoverInk,
+            hover
+          );
+
+
+        /*
+         * Финальный цвет.
+         */
+        vec3 finalColor =
+          mix(
+            background,
+            finalInk,
+            inkAmount
+          );
+
+        gl_FragColor =
+          vec4(
+            finalColor,
+            1.0
+          );
+      }
+    `
+  });
 
 
 /* =========================
@@ -622,7 +696,10 @@ const material =
 ========================= */
 
 const geometry =
-  new THREE.PlaneGeometry(2, 2);
+  new THREE.PlaneGeometry(
+    2,
+    2
+  );
 
 const mesh =
   new THREE.Mesh(
@@ -666,7 +743,9 @@ renderer.setAnimationLoop(
       clock.getDelta();
 
     uniforms.uActive.value =
-      active ? 1.0 : 0.0;
+      active
+        ? 1.0
+        : 0.0;
 
     renderer.render(
       scene,
