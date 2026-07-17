@@ -166,7 +166,8 @@ const material = new THREE.ShaderMaterial({
       vec2 gid = floor(frag / cell);
       vec2 fuv = fract(frag / cell);
 
-      float p = luma(texture2D(uPhoto, vUv).rgb);
+      vec3 photo = texture2D(uPhoto, vUv).rgb * 0.45;
+      float p = luma(photo);
       float mask = smoothstep(0.15, 0.9, 1.0 - p);
       mask = pow(mask, 1.6);
 
