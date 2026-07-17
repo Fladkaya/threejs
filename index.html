@@ -108,8 +108,8 @@ const uniforms = {
   uGrid:  { value: digitsGrid },
 
   uCellPx: { value: 10.0 },
-  uContrast: { value: 6.0 },
-  uInk: { value: 0.12 },
+  uContrast: { value: 10.0 },
+  uInk: { value: 0.03 },
 
   uHoverInkMul: { value: 0.20 },
   uBrushRadiusPx: { value: 60.0 },
@@ -167,7 +167,8 @@ const material = new THREE.ShaderMaterial({
       vec2 fuv = fract(frag / cell);
 
       float p = luma(texture2D(uPhoto, vUv).rgb);
-      float mask = pow(clamp(1.0 - p, 0.0, 1.0), uContrast);
+      float mask = smoothstep(0.15, 0.9, 1.0 - p);
+      mask = pow(mask, 1.6);
 
       vec2 mousePx = uMouse * uRes;
       float distPx = distance(frag, mousePx);
